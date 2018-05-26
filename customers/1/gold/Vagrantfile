@@ -1,0 +1,109 @@
+# vim: set ft=ruby:
+#
+# This guide is optimized for Vagrant 1.7 and above.
+# Although versions 1.6.x should behave very similarly, it is recommended
+# to upgrade instead of disabling the requirement below.
+Vagrant.require_version ">= 1.7.0"
+
+NUMBER_OF_WEBSERVERS = 3
+NUMBER_OF_DATABASES = 1
+CPU = 2
+MEMORY = 256
+ADMIN_USER = "vagrant"
+ADMIN_PASSWORD = "vagrant"
+VM_VERSION= "ubuntu/xenial64"
+#VM_VERSION= "https://cloud-images.ubuntu.com/vagrant/precise/current/precise-server-cloudimg-amd64-vagrant-disk1.box"
+VAGRANT_VM_PROVIDER = "virtualbox"
+
+Vagrant.configure(2) do |config|
+
+	groups = {
+		"webservers" => ["web[1:#{NUMBER_OF_WEBSERVERS}]"],
+		"databases" => ["db[1:#{NUMBER_OF_DATABASES}]"],
+		"loadbalancers" => ["lb1"],
+		"all_groups:children" => ["webservers","databases","loadbalancers"]
+	}
+
+	(1..NUMBER_OF_WEBSERVERS).each do |i|
+
+		config.vm.define "web#{i}" do |node|
+			node.vm.box = VM_VERSION
+			node.vm.hostname = "web#{i}"
+			node.vm.network :private_network, ip: "10.0.15.2#{i}"
+			node.vm.network "forwarded_port", guest: 80, host: "808#{i}"
+			node.vm.provider VAGRANT_VM_PROVIDER do |vb|
+				vb.memory = MEMORY
+			end
+
+			# Workaround for missing Python in vagrant Xenial image
+			node.vm.provision "shell", inline: "which python || sudo apt-get -y install python"
+
+			# Only execute once the Ansible provisioner,
+			# when all the machines are up and ready.
+
+			if i == NUMBER_OF_WEBSERVERS
+				# Provision hosts with ansible
+				node.vm.provision "ansible" do |ansible|
+					ansible.playbook = "gold-pb.yml"
+					ansible.become = true
+					ansible.limit = "webservers"
+					ansible.groups = groups
+				end
+			end
+
+		end
+	end
+
+	# Create database server(s)
+	(1..NUMBER_OF_DATABASES).each do |i|
+
+		config.vm.define "db#{i}" do |node|
+			node.vm.box = VM_VERSION
+			node.vm.hostname = "db#{i}"
+			node.vm.network :private_network, ip: "10.0.15.3#{i}"
+			node.vm.network "forwarded_port", guest: 3306, host: "330#{i}"
+			node.vm.provider VAGRANT_VM_PROVIDER do |vb|
+				vb.memory = 1024
+			end
+
+			# Workaround for missing Python in vagrant Xenial image
+			node.vm.provision "shell", inline: "which python || sudo apt-get -y install python"
+
+			# Only execute once the Ansible provisioner,
+			# when all the machines are up and ready.
+
+			if i == NUMBER_OF_DATABASES
+				# Provision hosts with ansible
+				node.vm.provision "ansible" do |ansible|
+					ansible.playbook = "gold-pb.yml"
+					ansible.become = true
+					ansible.limit = "databases"
+					ansible.groups = groups
+				end
+			end
+
+		end
+	end
+
+	# create load balancer
+	config.vm.define "lb1" do |lb_config|
+		lb_config.vm.box = VM_VERSION
+		lb_config.vm.hostname = "lb1"
+		lb_config.vm.network :private_network, ip: "10.0.15.11"
+		lb_config.vm.network "forwarded_port", guest: 80, host: 8011
+		lb_config.vm.provider VAGRANT_VM_PROVIDER do |vb|
+			vb.memory = MEMORY
+		end
+
+		# Workaround for missing Python in vagrant Xenial image
+		lb_config.vm.provision "shell", inline: "which python || sudo apt-get -y install python"
+
+		lb_config.vm.provision "ansible" do |ansible|
+
+			# Provision hosts with ansible
+			ansible.playbook = "gold-pb.yml"
+			ansible.become = true
+			ansible.groups = groups
+		end
+	end	
+end
