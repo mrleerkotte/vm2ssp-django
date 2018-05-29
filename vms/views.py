@@ -1,38 +1,81 @@
 from django.shortcuts import render
 from pprint import pprint
-import os, vagrant
+import os
 from subprocess import Popen, PIPE
-
-from .models import Customer, EnvironmentType, Environment
 
 
 def get_environments(customer_id):
     environments = os.listdir('./customers/' + customer_id)
+
+    return environments
+
+
+def get_environments_status(customer_id, environments):
+    status = []
+
+    for environment in environments:
+        state = {}
+        p = Popen(["vagrant", "status"], cwd='./customers/' + customer_id + "/" + environment, stdout=PIPE)
+
+        (stdout, stderr) = p.communicate()
+
+        comment = []
+        state['environment'] = environment
+
+        for line in stdout.strip().decode().splitlines():
+
+            if "virtualbox" in line:
+                #print(line)
+                comment.append(line)
+
+        pprint(stdout.decode())
+        if "running" in stdout.strip().decode():
+            state['created'] = True
+        else:
+            state['created'] = False
+
+        state['comment'] = comment
+
+        status.append(state)
+
+    return status
+
+
+def deploy_environment(request, customer_id, environment):
+    status = []
+    p = Popen(["vagrant", "up"], cwd='./customers/' + customer_id + "/" + environment, stdout=PIPE)
+    #return None
+    (stdout, stderr) = p.communicate()
+
+    for line in stdout.strip().decode().splitlines():
+        status.append(line)
+
+    context = {'customer_id': customer_id, 'environment': environment, 'status': status}
+    return render(request, 'vms/deploy.html', context)
+
+
+def destroy_environment(request, customer_id, environment):
+    status = []
+    p = Popen(["vagrant", "destroy", "-f"], cwd='./customers/' + customer_id + "/" + environment, stdout=PIPE)
+
+    (stdout, stderr) = p.communicate()
+
+    for line in stdout.strip().decode().splitlines():
+        status.append(line)
+
+    context = {'customer_id': customer_id, 'environment': environment, 'status': status}
+    return render(request, 'vms/destroy.html', context)
 
 
 # Create your views here.
 def index(request):
     customer = "Leerkotte"
     customer_id = "1"
-    status = []
 
-    customers = os.listdir("./customers")
-    environments = os.listdir("./customers/1")
+    environments = get_environments(customer_id)
+    status = get_environments_status(customer_id, environments)
 
-    current_environments = []
-    current_environment = "./customers/1/gold"
+    pprint(status)
 
-    p = Popen(["vagrant", "status"], cwd=current_environment, stdout=PIPE)
-
-    (stdout, stderr) = p.communicate()
-
-    for line in stdout.strip().decode().splitlines():
-        if "virtualbox" in line:
-            print(line)
-            status.append(line)
-
-    #pprint(customers)
-    #pprint(environments)
-
-    context = { 'environments': environments, 'customer': customer, 'status': status }
+    context = {'environments': environments, 'customer': customer, 'customer_id': customer_id, 'status': status}
     return render(request, 'vms/index.html', context)

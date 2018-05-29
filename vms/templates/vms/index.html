@@ -18,7 +18,7 @@
     <!--<input class="form-control form-control-dark w-100" placeholder="Search" aria-label="Search" type="text">-->
     <ul class="navbar-nav px-3">
         <li class="nav-item text-nowrap">
-            <a class="nav-link" href="#">Sign out</a>
+            <!--<a class="nav-link" href="#">Sign out</a>-->
         </li>
     </ul>
 </nav>
@@ -73,16 +73,38 @@
                 <h1 class="h2">Environments</h1>
             </div>
         <div class="card-deck">
-            {% for environment in environments %}
-            <div class="card" style="margin: 10px;">
-                    <h5 class="card-header">{{ environment }}</h5>
-                <div class="card-body" style="padding: 0; margin: 0;">
+            {% for state in status %}
+            <div class="card">
+                    <h5 class="card-header">{{ state.environment }}</h5>
+                <div class="card-body">
                     <!--<p class="card-text">Some quick example text to build on the card title and make up the bulk of the card's content.</p>-->
-                    <ul class="list-group">
-                        {% for state in status %}
-                            <li class="list-group-item">{{ state }}</li>
-                        {% endfor %}
-                    </ul>
+
+                        {% if not state.created %}
+                            <h5 class="card-title">Not created</h5>
+                            <p class="card-text">
+                                A {{ state.environment }} environment consists of the following: <br>
+                            {% if state.environment == 'bronze'%}
+                                - 1 x Web server <br>
+                            {% elif state.environment == 'silver' %}
+                                - 1 x Load balancer <br>
+                                - 2 x Web server <br>
+                            {% elif state.environment == 'gold' %}
+                                - 1 x Load balancer <br>
+                                - 2 x Web server <br>
+                                - 1 x Database server <br>
+                            {% endif %}
+                            </p>
+                            <a href="/deploy/{{ customer_id }}/{{ state.environment }}" class="btn btn-primary">Create</a>
+                        {% else %}
+                            <h5 class="card-title">Created</h5>
+                            <p class="card-text">
+                            {% for line in state.comment %}
+                                - {{ line }} <br>
+                            {% endfor %}
+                            </p>
+                            <a href="/destroy/{{ customer_id }}/{{ state.environment }}" class="btn btn-danger">Destroy</a>
+                        {% endif %}
+
                     <!--<a href="#" class="btn btn-primary">Go somewhere</a>-->
                 </div>
             </div>
@@ -102,9 +124,13 @@
                             <td>{{ environment }}</td>
                             <td>
                                 <ul class="list-group">
-                                {% for state in status %}
-                                        <li class="list-group-item">{{ state }}</li>
-                                {% endfor %}
+                                {% if status.created %}
+                                    <a href="#" class="btn btn-primary">Go somewhere</a>
+                                {% else %}
+                                    {% for state in status %}
+                                            <li class="list-group-item">{{ state }}</li>
+                                    {% endfor %}
+                                {% endif %}
                                 </ul>
                             </td>
                         </tr>
