@@ -3,19 +3,24 @@ from pprint import pprint
 import os
 from subprocess import Popen, PIPE
 
+def get_customers():
+    customers = os.listdir('./customers/')
 
-def get_environments(customer_id):
-    environments = os.listdir('./customers/' + customer_id)
+    return customers
+
+
+def get_environments(customer, customer_id):
+    environments = os.listdir('./customers/' + customer_id + "_" + customer)
 
     return environments
 
 
-def get_environments_status(customer_id, environments):
+def get_environments_status(customer, customer_id, environments):
     status = []
 
     for environment in environments:
         state = {}
-        p = Popen(["vagrant", "status"], cwd='./customers/' + customer_id + "/" + environment, stdout=PIPE)
+        p = Popen(["vagrant", "status"], cwd='./customers/' + customer_id + "_" + customer + "/" + environment, stdout=PIPE)
 
         (stdout, stderr) = p.communicate()
 
@@ -25,7 +30,7 @@ def get_environments_status(customer_id, environments):
         for line in stdout.strip().decode().splitlines():
 
             if "virtualbox" in line:
-                #print(line)
+                # print(line)
                 comment.append(line)
 
         pprint(stdout.decode())
@@ -41,39 +46,54 @@ def get_environments_status(customer_id, environments):
     return status
 
 
-def deploy_environment(request, customer_id, environment):
+def deploy_environment(request, customer, customer_id, environment):
     status = []
-    p = Popen(["vagrant", "up"], cwd='./customers/' + customer_id + "/" + environment, stdout=PIPE)
-    #return None
+    p = Popen(["vagrant", "up"], cwd='./customers/' + customer_id + "_" + customer + "/" + environment, stdout=PIPE)
+
     (stdout, stderr) = p.communicate()
 
     for line in stdout.strip().decode().splitlines():
         status.append(line)
 
-    context = {'customer_id': customer_id, 'environment': environment, 'status': status}
+    context = {'customer': customer, 'customer_id': customer_id, 'environment': environment, 'status': status}
     return render(request, 'vms/deploy.html', context)
 
 
-def destroy_environment(request, customer_id, environment):
+def destroy_environment(request, customer, customer_id, environment):
     status = []
-    p = Popen(["vagrant", "destroy", "-f"], cwd='./customers/' + customer_id + "/" + environment, stdout=PIPE)
+    p = Popen(["vagrant", "destroy", "-f"], cwd='./customers/' + customer_id + "_" + customer + "/" + environment, stdout=PIPE)
 
     (stdout, stderr) = p.communicate()
 
     for line in stdout.strip().decode().splitlines():
         status.append(line)
 
-    context = {'customer_id': customer_id, 'environment': environment, 'status': status}
+    context = {'customer': customer, 'customer_id': customer_id, 'environment': environment, 'status': status}
     return render(request, 'vms/destroy.html', context)
+
+
+def select_customer(request):
+    customers = []
+    result = get_customers()
+
+    for customer in result:
+        i = customer.split("_")
+        pprint(i)
+        customers.append(i)
+
+    context = {'customers': customers}
+    return render(request, 'vms/login.html', context)
 
 
 # Create your views here.
 def index(request):
-    customer = "Leerkotte"
-    customer_id = "1"
+    login = request.GET.get('customer', '')
+    login = login.split("_")
+    customer = login[1]
+    customer_id = login[0]
 
-    environments = get_environments(customer_id)
-    status = get_environments_status(customer_id, environments)
+    environments = get_environments(customer, customer_id)
+    status = get_environments_status(customer, customer_id, environments)
 
     pprint(status)
 
