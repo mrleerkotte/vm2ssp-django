@@ -1,0 +1,16 @@
+---
+- hosts: all
+  gather_facts: True
+  tasks: []
+
+- hosts: webservers
+  roles:
+    - web
+
+- hosts: databases
+  roles:
+    - db
+
+- hosts: loadbalancers
+  roles:
+    - lb

@@ -1,0 +1,20 @@
+---
+- name: gather facts from webservers
+  setup:
+  delegate_to: "{{item}}"
+  delegate_facts: True
+  with_items: "{{groups['webservers']}}"
+
+- name: install haproxy and socat
+  apt: pkg={{ item }} state=latest update_cache=yes
+  with_items:
+    - haproxy
+    - socat
+
+- name: enable haproxy
+  lineinfile: dest=/etc/default/haproxy regexp="^ENABLED" line="ENABLED=1"
+  notify: restart haproxy 
+
+- name: deploy haproxy config
+  template: src=haproxy.cfg.j2 dest=/etc/haproxy/haproxy.cfg
+  notify: restart haproxy
